@@ -1,0 +1,103 @@
+
+================================================================================
+INSPECTING: c:/Users/User/Documents/RappiReportes_version1/archivoExcel_PedidosYa_Español/invoice-9601395690.xls
+================================================================================
+
+✓ Read via OPENPYXL (header=[0,1])
+
+FLATTENED COLUMNS:
+--------------------------------------------------------------------------------
+  0: numero de pedido 1852547948
+  1: order status unnamed: 1_level_1
+  2: sucursal astrobuns smash burgers
+  3: fecha de pedido 06/01/2026
+  4: monto de la venta ($) 27.9
+  5: envio a cargo del local
+  6: descuento otorgado por peya a usuarios
+  7: desc. comerciales retiro en el local
+  8: monto venta + envió cobrado por el local
+  9: monto comisionable servicios pedidosya 18.45
+ 10: servicio ventas pedidosya (%) 5.00%
+ 11: servicio ventas pedidoya ($) 0.92
+ 12: cargos por pedidos con plus
+ 13: plus no
+ 14: descuento tarifa de servicio al cliente
+ 15: pedido con comodin si
+ 16: método de pago pago fuera de la aplicación
+ 17: cobrado por pedidosya
+ 18: método de entrega envío de pedidosya
+
+================================================================================
+FIRST 3 DATA ROWS:
+================================================================================
+
+Row 0:
+  numero de pedido 1852547948: 1853034891 (type: int)
+  order status unnamed: 1_level_1: nan (type: float)
+  sucursal astrobuns smash burgers: Incheon - Comida Coreana (type: str)
+  fecha de pedido 06/01/2026: 07/01/2026 (type: str)
+  monto de la venta ($) 27.9: 28.8 (type: float)
+  envio a cargo del local: 0 (type: int)
+  descuento otorgado por peya a usuarios: 0 (type: int)
+  desc. comerciales retiro en el local: 0 (type: int)
+  monto venta + envió cobrado por el local: 0 (type: int)
+  monto comisionable servicios pedidosya 18.45: 18.9 (type: float)
+  servicio ventas pedidosya (%) 5.00%: 5.00% (type: str)
+  servicio ventas pedidoya ($) 0.92: 0.95 (type: float)
+  cargos por pedidos con plus: 0 (type: int)
+  plus no: No (type: str)
+  descuento tarifa de servicio al cliente: 0 (type: int)
+  pedido con comodin si: Si (type: str)
+  método de pago pago fuera de la aplicación: Pago en la aplicación (type: str)
+  cobrado por pedidosya: PedidosYa (type: str)
+  método de entrega envío de pedidosya: Envío de PedidosYa (type: str)
+
+Row 1:
+  numero de pedido 1852547948: 1853644864 (type: int)
+  order status unnamed: 1_level_1: nan (type: float)
+  sucursal astrobuns smash burgers: Incheon - Comida Coreana (type: str)
+  fecha de pedido 06/01/2026: 07/01/2026 (type: str)
+  monto de la venta ($) 27.9: 23.33 (type: float)
+  envio a cargo del local: 0 (type: int)
+  descuento otorgado por peya a usuarios: 0 (type: int)
+  desc. comerciales retiro en el local: 0 (type: int)
+  monto venta + envió cobrado por el local: 0 (type: int)
+  monto comisionable servicios pedidosya 18.45: 23.33 (type: float)
+  servicio ventas pedidosya (%) 5.00%: 5.00% (type: str)
+  servicio ventas pedidoya ($) 0.92: 1.17 (type: float)
+  cargos por pedidos con plus: 0 (type: int)
+  plus no: No (type: str)
+  descuento tarifa de servicio al cliente: 0 (type: int)
+  pedido con comodin si: No (type: str)
+  método de pago pago fuera de la aplicación: Pago en la aplicación (type: str)
+  cobrado por pedidosya: PedidosYa (type: str)
+  método de entrega envío de pedidosya: Envío de PedidosYa (type: str)
+
+Row 2:
+  numero de pedido 1852547948: 1854699013 (type: int)
+  order status unnamed: 1_level_1: nan (type: float)
+  sucursal astrobuns smash burgers: Astrobuns Smash Burgers (type: str)
+  fecha de pedido 06/01/2026: 08/01/2026 (type: str)
+  monto de la venta ($) 27.9: 45.8 (type: float)
+  envio a cargo del local: 0 (type: int)
+  descuento otorgado por peya a usuarios: 0 (type: int)
+  desc. comerciales retiro en el local: 0 (type: int)
+  monto venta + envió cobrado por el local: 0 (type: int)
+  monto comisionable servicios pedidosya 18.45: 29.9 (type: float)
+  servicio ventas pedidosya (%) 5.00%: 5.00% (type: str)
+  servicio ventas pedidoya ($) 0.92: 1.5 (type: float)
+  cargos por pedidos con plus: 0 (type: int)
+  plus no: No (type: str)
+  descuento tarifa de servicio al cliente: 0 (type: int)
+  pedido con comodin si: Si (type: str)
+  método de pago pago fuera de la aplicación: Pago fuera de la aplicación (type: str)
+  cobrado por pedidosya: PedidosYa (type: str)
+  método de entrega envío de pedidosya: Envío de PedidosYa (type: str)
+
+================================================================================
+INSPECTING: c:/Users/User/Documents/RappiReportes_version1/archivoExcel_PedidosYa_Español/orderDetails (5).xlsx
+================================================================================
+
+✗ OPENPYXL failed: Unable to read workbook: could not read stylesheet from c:/Users/User/Documents/RappiReportes_version1/archivoExcel_PedidosYa_Español/orderDetails (5).xlsx.
+This is most probably because the workbook source files contain some invalid XML.
+Please see the exception for more details.

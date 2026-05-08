@@ -1,0 +1,21 @@
+RESULTADOS DEL PROCESAMIENTO:
+================================================================================
+
+Incheon | Korean Fried Chicken:
+  Total: S/.83.93
+  Cantidad pedidos: 3
+  Promociones: -S/.0.00
+  Descuentos fugaces: -S/.0.00
+  Descuentos cancelaciones: -S/.0.00
+  Descuentos reclamos: -S/.0.00
+  Reintegros tienda: +S/.0.00
+
+Astrobuns | Smashburgers:
+  Total: S/.111.60
+  Cantidad pedidos: 3
+  Promociones: -S/.0.00
+  Descuentos fugaces: -S/.0.00
+  Descuentos cancelaciones: -S/.0.00
+  Descuentos reclamos: -S/.0.00
+  Reintegros tienda: +S/.0.00
+

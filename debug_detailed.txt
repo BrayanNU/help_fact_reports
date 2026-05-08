@@ -1,0 +1,31 @@
+DETAILED DIAGNOSTIC
+================================================================================
+
+Total rows: 6
+
+Column 'order status' or 'estado': order status unnamed: 1_level_1
+Column 'sucursal': sucursal astrobuns smash burgers
+Column 'monto de la venta': monto de la venta ($) 27.9
+
+First 5 sucursal values:
+  0: 'Incheon - Comida Coreana' -> None
+  1: 'Incheon - Comida Coreana' -> None
+  2: 'Astrobuns Smash Burgers' -> Astrobuns | Smashburgers
+  3: 'Astrobuns Smash Burgers' -> Astrobuns | Smashburgers
+  4: 'Astrobuns Smash Burgers' -> Astrobuns | Smashburgers
+
+First 5 estado values:
+  0: 'nan'
+  1: 'nan'
+  2: 'nan'
+  3: 'nan'
+  4: 'nan'
+
+Rows after filtering for 'delivered': 0
+
+First 5 'monto de la venta' values:
+  0: 28.8 (type: float)
+  1: 23.33 (type: float)
+  2: 45.8 (type: float)
+  3: 35.9 (type: float)
+  4: 29.9 (type: float)
