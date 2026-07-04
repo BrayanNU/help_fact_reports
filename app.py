@@ -7,6 +7,13 @@ import unicodedata
 from PIL import Image, ImageTk
 logo_img_tk = None
 
+# ==========================
+# ESTADO GLOBAL: FILTRO DE MESES
+# ==========================
+# None = todos los meses (Opción 1)
+# lista de ints = meses específicos (Opción 2)
+meses_seleccionados = None  # e.g. [4, 5] para abril y mayo
+
 from excel_processorRappi_DetallesVentas import procesar_finanzas_rappi
 from excel_processorPedidosYa_DetallesVentas import procesar_finanzas_pedidosya
 from excel_processorRappi_DetallesPedidos import procesar_excel_rappi as procesar_rappi
@@ -31,14 +38,14 @@ def normalizar_texto(texto):
     return texto
 
 def procesar():
+    global meses_seleccionados
+
     rutas = filedialog.askopenfilenames(
         title="Selecciona reportes",
         filetypes=[("Archivos Excel", "*.xlsx *.xls"), ("Todos", "*.*")]
     )
     if not rutas:
         return
-
-
 
     dfs = []
     fechas_inicio = []
@@ -50,14 +57,14 @@ def procesar():
 
             # 1️⃣ Intentar PedidosYa
             try:
-                df, fi, ff = procesar_pedidosya([ruta])
+                df, fi, ff = procesar_pedidosya([ruta], meses_seleccionados=meses_seleccionados)
             except Exception:
                 df = None
 
             # 2️⃣ Si no fue PedidosYa → intentar Rappi
             if df is None:
                 try:
-                    df, fi, ff = procesar_rappi([ruta])
+                    df, fi, ff = procesar_rappi([ruta], meses_seleccionados=meses_seleccionados)
                 except Exception:
                     df = None
 
@@ -99,13 +106,15 @@ def procesar():
         finanzas_pedidosya = procesar_finanzas_pedidosya(
             rutas=rutas,
             fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin
+            fecha_fin=fecha_fin,
+            meses_seleccionados=meses_seleccionados
         )
 
         finanzas_rappi = procesar_finanzas_rappi(
             rutas=rutas,
             fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin
+            fecha_fin=fecha_fin,
+            meses_seleccionados=meses_seleccionados
         )
 
         ruta_pdf = filedialog.asksaveasfilename(
@@ -198,10 +207,105 @@ ttk.Label(
     font=("Arial", 14, "bold")
 ).pack(pady=10)
 
+# ==========================
+# SELECTOR DE MESES
+# ==========================
+frame_meses = ttk.LabelFrame(
+    tab_reportes,
+    text="Filtro de meses a procesar",
+    padding=(15, 10)
+)
+frame_meses.pack(pady=10, padx=30, fill="x")
+
+NOMBRES_MESES = [
+    (1, "Enero"), (2, "Febrero"), (3, "Marzo"),
+    (4, "Abril"), (5, "Mayo"), (6, "Junio"),
+    (7, "Julio"), (8, "Agosto"), (9, "Septiembre"),
+    (10, "Octubre"), (11, "Noviembre"), (12, "Diciembre")
+]
+
+# Variable para la opción ("todos" o "especificos")
+var_modo_meses = tk.StringVar(value="todos")
+
+# Diccionario de checkboxes de meses: {num_mes: BooleanVar}
+checkbox_vars_meses = {num: tk.BooleanVar(value=False) for num, _ in NOMBRES_MESES}
+
+frame_radio = ttk.Frame(frame_meses)
+frame_radio.pack(anchor="w", pady=(0, 8))
+
+ttk.Radiobutton(
+    frame_radio,
+    text="Procesar todos los meses detectados en los archivos subidos",
+    variable=var_modo_meses,
+    value="todos",
+    command=lambda: _actualizar_estado_checkboxes()
+).pack(anchor="w")
+
+ttk.Radiobutton(
+    frame_radio,
+    text="Procesar solo meses específicos",
+    variable=var_modo_meses,
+    value="especificos",
+    command=lambda: _actualizar_estado_checkboxes()
+).pack(anchor="w", pady=(4, 0))
+
+# Grid de checkboxes (4 por fila)
+frame_checks = ttk.Frame(frame_meses)
+frame_checks.pack(anchor="w", padx=20, pady=(4, 0))
+
+_checkboxes_widgets = {}
+for idx, (num, nombre) in enumerate(NOMBRES_MESES):
+    fila = idx // 4
+    col = idx % 4
+    cb = ttk.Checkbutton(
+        frame_checks,
+        text=nombre,
+        variable=checkbox_vars_meses[num],
+        state="disabled"
+    )
+    cb.grid(row=fila, column=col, sticky="w", padx=10, pady=2)
+    _checkboxes_widgets[num] = cb
+
+
+def _actualizar_estado_checkboxes():
+    """Habilita o deshabilita los checkboxes según el modo seleccionado."""
+    estado = "normal" if var_modo_meses.get() == "especificos" else "disabled"
+    for cb in _checkboxes_widgets.values():
+        cb.configure(state=estado)
+    if estado == "disabled":
+        for v in checkbox_vars_meses.values():
+            v.set(False)
+
+
+def _obtener_meses_seleccionados():
+    """Retorna lista de ints con los meses marcados, o None si es 'todos'."""
+    global meses_seleccionados
+    if var_modo_meses.get() == "todos":
+        meses_seleccionados = None
+        return None
+    seleccionados = [num for num, var in checkbox_vars_meses.items() if var.get()]
+    if not seleccionados:
+        messagebox.showwarning(
+            "Sin meses seleccionados",
+            "Seleccionaste 'meses específicos' pero no marcaste ninguno.\n"
+            "Se procesarán todos los meses."
+        )
+        meses_seleccionados = None
+        return None
+    meses_seleccionados = sorted(seleccionados)
+    return meses_seleccionados
+
+
+def procesar_con_filtro():
+    """Wrapper que captura la selección de meses y luego llama a procesar()."""
+    _obtener_meses_seleccionados()
+    procesar()
+
+
 ttk.Button(
     tab_reportes,
     text="Seleccionar Excel y generar reporte PDF",
-    command=procesar
+    command=procesar_con_filtro
 ).pack(pady=20)
 
 

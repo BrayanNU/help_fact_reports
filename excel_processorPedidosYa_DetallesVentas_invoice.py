@@ -77,7 +77,8 @@ def obtener_sucursal_base(nombre):
     nombre = normalizar_texto(nombre)
     SUCURSALES_VALIDAS = {
         "astrobuns smash burgers": "Astrobuns | Smashburgers",
-        "incheon - comida coreana": "Incheon | Korean Fried Chicken"
+        "incheon - comida coreana": "Incheon | Korean Fried Chicken",
+        "chickibuns": "Chickibuns"
     }
     return SUCURSALES_VALIDAS.get(nombre, None)
 
@@ -170,7 +171,7 @@ def read_broken_xlsx(ruta_archivo):
 # ==========================================
 # BLOQUE 1: LOGICA ORIGINAL (INGLES)
 # ==========================================
-def procesar_bloque_ingles(ruta, hojas, resultados):
+def procesar_bloque_ingles(ruta, hojas, resultados, meses_seleccionados=None):
     processed_count = 0
     
     # ==============================
@@ -200,8 +201,18 @@ def procesar_bloque_ingles(ruta, hojas, resultados):
 
         # TOTAL
         col_total = encontrar_columna_por_texto(df, "subtotal")
+        col_fecha = encontrar_columna_por_texto(df, "accepted at")
         if col_total:
             for _, fila in df.iterrows():
+
+                # ==========================
+                # FILTRO POR MES (si aplica)
+                # ==========================
+                if meses_seleccionados and col_fecha:
+                    fecha_fila = pd.to_datetime(fila[col_fecha], errors="coerce")
+                    if pd.notna(fecha_fila) and fecha_fila.month not in meses_seleccionados:
+                        continue
+
                 sucursal = obtener_sucursal_base(fila[col_sucursal])
                 if not sucursal:
                     continue
@@ -345,7 +356,7 @@ def procesar_bloque_ingles(ruta, hojas, resultados):
 # ==========================================================================================================
 # BLOQUE 2: COPIA EXACTA CON CAMBIOS STRING
 # ==========================================================================================================
-def procesar_bloque_espanol(ruta, hojas, resultados):
+def procesar_bloque_espanol(ruta, hojas, resultados, meses_seleccionados=None):
     processed_count = 0
     
     # ==============================
@@ -385,6 +396,7 @@ def procesar_bloque_espanol(ruta, hojas, resultados):
         # TOTAL
         col_total = encontrar_columna_por_texto(df_total, "monto de la venta")
         col_cobrado_por = encontrar_columna_por_texto(df_total, "cobrado por")
+        col_fecha = encontrar_columna_por_texto(df_total, "fecha del pedido")
 
         if col_total and col_cobrado_por:
 
@@ -395,6 +407,14 @@ def procesar_bloque_espanol(ruta, hojas, resultados):
                 if cobrado != "PedidosYa":
                     continue
 
+                # ==========================
+                # FILTRO POR MES (si aplica)
+                # ==========================
+                if meses_seleccionados and col_fecha:
+                    fecha_fila = pd.to_datetime(fila[col_fecha], errors="coerce")
+                    if pd.notna(fecha_fila) and fecha_fila.month not in meses_seleccionados:
+                        continue
+
                 sucursal = obtener_sucursal_base(fila[col_sucursal])
                 if not sucursal:
                     continue
@@ -404,20 +424,6 @@ def procesar_bloque_espanol(ruta, hojas, resultados):
 
                 resultados[sucursal]["total"] += obtener_valor_seguro(fila[col_total])
                 resultados[sucursal]["cantidad_pedidos"] += 1
-        
-        # ======================================
-            # SALIDA CONSOLA
-            # ======================================
-            for suc in resultados:
-                for k in resultados[suc]:
-                    if resultados[suc][k] is None:
-                        resultados[suc][k] = 0.0
-
-            # ===== IMPRESIÓN DEL TOTAL DE VENTAS =====
-            total_ventas = sum(resultados[suc]["total"] for suc in resultados)
-            print(f"\n*** TOTAL VENTAS AQUÍ: S/.{total_ventas:.2f} ***\n")
-
-            return resultados
 
         # PROMOCIONES - use actual Spanish column names
         col_desc_art = encontrar_columna_por_texto(df, "descuentos subsidiados por la tienda")
@@ -552,8 +558,8 @@ def procesar_bloque_espanol(ruta, hojas, resultados):
 # ==========================================
 # FUNCIÓN CENTRAL
 # ==========================================
-def procesar_finanzas_pedidosya(rutas, fecha_inicio=None, fecha_fin=None):
-    SUCURSALES_BASE = ["Astrobuns | Smashburgers", "Incheon | Korean Fried Chicken"]
+def procesar_finanzas_pedidosya(rutas, fecha_inicio=None, fecha_fin=None, meses_seleccionados=None):
+    SUCURSALES_BASE = ["Astrobuns | Smashburgers", "Incheon | Korean Fried Chicken", "Chickibuns"]
 
     resultados = defaultdict(lambda: {
         "total": 0.0,
@@ -589,11 +595,11 @@ def procesar_finanzas_pedidosya(rutas, fecha_inicio=None, fecha_fin=None):
             continue
             
         # 3. Probar Bloque 1 (Ingles)
-        if procesar_bloque_ingles(ruta, hojas, resultados):
+        if procesar_bloque_ingles(ruta, hojas, resultados, meses_seleccionados=meses_seleccionados):
             continue
             
         # 4. Probar Bloque 2 (Espanol - Fallback)
-        procesar_bloque_espanol(ruta, hojas, resultados)
+        procesar_bloque_espanol(ruta, hojas, resultados, meses_seleccionados=meses_seleccionados)
 
     # ======================================
     # SALIDA CONSOLA

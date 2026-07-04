@@ -1,4 +1,4 @@
-from reportlab.lib.pagesizes import A4
+﻿from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
     Image, SimpleDocTemplate, Paragraph, Spacer,
     Table, TableStyle, PageBreak
@@ -11,9 +11,11 @@ from datetime import datetime
 import pandas as pd
 import os
 import math
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, Dict, Any, List, Union
 
 from config_manager import load_footer_config, load_invoice_config
+from financial_parser import validar_finanzas
 
 
 def safe_get(fila: pd.Series, columna: str, default: Any = "N/A"):
@@ -149,14 +151,15 @@ A la atención de <b>{invoice.get('atencion', '')}</b><br/>
         )
     )
 
-    COMISION: float = 0.26
+    COMISION: Decimal = Decimal("0.26")
 
-    total_comisiones: float = 0.0
+    total_comisiones: Decimal = Decimal("0")
     filas_factura: List[List[Union[str, Paragraph]]] = []
 
     SUCURSALES = [
         "Astrobuns | Smashburgers",
-        "Incheon | Korean Fried Chicken"
+        "Incheon | Korean Fried Chicken",
+        "Chickibuns"
     ]
     for sucursal in SUCURSALES:
 
@@ -167,14 +170,19 @@ A la atención de <b>{invoice.get('atencion', '')}</b><br/>
 
             data = grupo[sucursal]
 
-            neto = round(
-                float(data.get("total", 0))
-                - abs(float(data.get("promociones_articulos", 0)))
-                - abs(float(data.get("descuentos_fugaces", 0))),
-                2
-            )
+            # TOTAL BRUTO (Decimal): monto de ventas SIN ningun descuento
+            bruto = Decimal(str(data.get("total", 0))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-            comision = round(neto * COMISION, 2)
+            # COMISION: siempre sobre el total bruto mostrado (nunca sobre neto)
+            comision = (bruto * COMISION).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+            # Validacion automatica de consistencia
+            comision_esperada = (bruto * COMISION).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if comision != comision_esperada:
+                print(
+                    f'[ERROR] Comision inconsistente con total bruto mostrado: '
+                    f'{sucursal} {app} comision={comision} esperada={comision_esperada}'
+                )
 
             total_comisiones += comision
 
@@ -183,7 +191,7 @@ A la atención de <b>{invoice.get('atencion', '')}</b><br/>
             ])
 
             filas_factura.append([
-                f"{data.get('cantidad_pedidos', 0)} pedidos por un total de S/.{neto:.2f}"
+                f"{data.get('cantidad_pedidos', 0)} pedidos por un total de S/.{bruto:.2f}"
             ])
 
             filas_factura.append([
@@ -197,9 +205,9 @@ A la atención de <b>{invoice.get('atencion', '')}</b><br/>
     # SUBTOTALES
     # ==========================
 
-    subtotal = round(total_comisiones, 2)
-    igv = round(subtotal * 0.18, 2)
-    importe_total = round(subtotal + igv, 2)
+    subtotal = Decimal(str(total_comisiones)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    igv = (subtotal * Decimal("0.18")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    importe_total = (subtotal + igv).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     filas_factura += [
         ["", ""],
@@ -300,7 +308,7 @@ A la atención de <b>{invoice.get('atencion', '')}</b><br/>
                 ["Descuento por reclamos de usuarios", f"una cantidad de -S/.{data['descuentos_reclamos']:.2f}"])
 
         if data.get("reintegros_tienda", 0):
-            filas.append(["Reintegro a favor de la tienda", f"una cantidad de +S/.{data['reintegros_tienda']:.2f}"])
+            filas.append(["Reintegro a favor de la tienda", f"una cantidad de +S/.{abs(data['reintegros_tienda']):.2f}"])
 
         filas = [[sanitize_cell(c) for c in f] for f in filas]
 
@@ -321,7 +329,8 @@ A la atención de <b>{invoice.get('atencion', '')}</b><br/>
     # ORDEN FIJO
     SUCURSALES = [
         "Astrobuns | Smashburgers",
-        "Incheon | Korean Fried Chicken"
+        "Incheon | Korean Fried Chicken",
+        "Chickibuns"
     ]
 
     for sucursal in SUCURSALES:
@@ -334,23 +343,22 @@ A la atención de <b>{invoice.get('atencion', '')}</b><br/>
 
 
     def calcular_saldo_total(*diccionarios: Any) -> float:
-
-        saldo: float = 0.0
-
+        # FIX Bug#1: compensaciones Rappi + Decimal para precision exacta
+        saldo = Decimal("0")
         for grupo in diccionarios:
             if not grupo:
                 continue
             for data in grupo.values():
-                saldo += float(data.get("total", 0))
+                saldo += Decimal(str(data.get("total", 0)))
+                saldo -= abs(Decimal(str(data.get("promociones_articulos", 0))))
+                saldo -= abs(Decimal(str(data.get("descuentos_fugaces", 0))))
+                saldo -= abs(Decimal(str(data.get("descuentos_cancelaciones", 0))))
+                saldo -= abs(Decimal(str(data.get("descuentos_reclamos", 0))))
+                saldo -= abs(Decimal(str(data.get("compensaciones", 0))))
+                saldo += abs(Decimal(str(data.get("reintegros_tienda", 0))))
+        return saldo.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-                saldo -= abs(float(data.get("promociones_articulos", 0)))
-                saldo -= abs(float(data.get("descuentos_fugaces", 0)))
-                saldo -= abs(float(data.get("descuentos_cancelaciones", 0)))
-                saldo -= abs(float(data.get("descuentos_reclamos", 0)))
-
-                saldo += float(data.get("reintegros_tienda", 0))
-
-        return round(saldo, 2)
+    validar_finanzas(finanzas_rappi, finanzas_pedidosya)
 
     saldo_restante = calcular_saldo_total(
         finanzas_rappi,
@@ -359,7 +367,7 @@ A la atención de <b>{invoice.get('atencion', '')}</b><br/>
 
     pago_factura = importe_total
 
-    pago_cci = round(saldo_restante - pago_factura, 2)
+    pago_cci = (saldo_restante - pago_factura).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     elementos.append(Spacer(1, 10))
 

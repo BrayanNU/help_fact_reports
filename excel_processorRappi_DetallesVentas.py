@@ -67,7 +67,8 @@ def obtener_sucursal_base(nombre):
     nombre = normalizar_texto(nombre)
     SUCURSALES = {
         "astrobuns - comas": "Astrobuns | Smashburgers",
-        "incheon comas": "Incheon | Korean Fried Chicken"
+        "incheon comas": "Incheon | Korean Fried Chicken",
+        "chickibuns": "Chickibuns"
     }
     return SUCURSALES.get(nombre)
 
@@ -76,7 +77,7 @@ def obtener_sucursal_base(nombre):
 # FUNCIÓN CENTRAL RAPPI
 # ==========================================
 
-def procesar_finanzas_rappi(rutas, fecha_inicio=None, fecha_fin=None):
+def procesar_finanzas_rappi(rutas, fecha_inicio=None, fecha_fin=None, meses_seleccionados=None):
 
     resultados = defaultdict(lambda: {
         "total": 0.0,                   # Venta bruta de pedidos
@@ -92,6 +93,7 @@ def procesar_finanzas_rappi(rutas, fecha_inicio=None, fecha_fin=None):
     for ruta in rutas:
         print(f"\n📂 Procesando archivo: {ruta}")
 
+        df = None
         try:
             df = pd.read_excel(
                 ruta,
@@ -99,9 +101,20 @@ def procesar_finanzas_rappi(rutas, fecha_inicio=None, fecha_fin=None):
                 header=[0, 1],
                 engine="openpyxl"
             )
-        except Exception as e:
-            print(f"❌ No se pudo leer el archivo: {e}")
-            continue
+        except Exception:
+            pass
+
+        if df is None:
+            try:
+                df = pd.read_excel(
+                    ruta,
+                    sheet_name="Detalle",
+                    header=[0, 1],
+                    engine="xlrd"
+                )
+            except Exception as e:
+                print(f"❌ No se pudo leer el archivo: {e}")
+                continue
 
         if df is None or df.empty:
             print("⚠️ Archivo vacío, se omite")
@@ -118,6 +131,8 @@ def procesar_finanzas_rappi(rutas, fecha_inicio=None, fecha_fin=None):
         col_total = encontrar_columna_por_texto(df, "venta bruta")
         col_promos = encontrar_columna_por_texto(df, "descuento de producto")
         col_compensaciones = encontrar_columna_por_texto(df, "compensaciones")
+        col_fecha = encontrar_columna_por_texto(df, "fecha de creacion")
+        col_costo_canceladas = encontrar_columna_por_texto(df, "costo canceladas")
 
         print("🔍 Columnas detectadas:")
         print(f"   - Estado orden: {col_estado_orden}")
@@ -126,6 +141,7 @@ def procesar_finanzas_rappi(rutas, fecha_inicio=None, fecha_fin=None):
         print(f"   - Venta bruta: {col_total}")
         print(f"   - Promos: {col_promos}")
         print(f"   - Compensaciones: {col_compensaciones}")
+        print(f"   - Costo Canceladas: {col_costo_canceladas}")
 
         if not (col_sucursal and col_total):
             print("❌ Faltan columnas críticas, se omite archivo")
@@ -147,6 +163,15 @@ def procesar_finanzas_rappi(rutas, fecha_inicio=None, fecha_fin=None):
                 estado = str(fila[col_estado_orden]).lower().strip()
 
                 if estado in ["pending_review", "finished"]:
+
+                    # ==========================
+                    # FILTRO POR MES (si aplica)
+                    # ==========================
+                    if meses_seleccionados and col_fecha:
+                        fecha_fila = pd.to_datetime(fila[col_fecha], errors="coerce")
+                        if pd.notna(fecha_fila) and fecha_fila.month not in meses_seleccionados:
+                            continue
+
                     monto = obtener_valor_seguro(fila[col_total])
 
                     resultados[sucursal]["cantidad_pedidos"] += 1
@@ -179,6 +204,22 @@ def procesar_finanzas_rappi(rutas, fecha_inicio=None, fecha_fin=None):
                     print(
                         f"💸 COMPENSACIÓN | {sucursal} | Monto={comp}"
                     )
+
+            # --------------------------
+            # REINTEGROS (canceled)
+            # --------------------------
+            if col_estado_orden and col_costo_canceladas:
+                estado_cancelado = str(fila[col_estado_orden]).lower().strip()
+
+                if estado_cancelado == "canceled":
+                    costo = obtener_valor_seguro(fila[col_costo_canceladas])
+                    if costo != 0:
+                        resultados[sucursal]["reintegros_tienda"] += costo
+
+                        print(
+                            f"[REINTEGRO] {sucursal} | "
+                            f"Estado={estado_cancelado} | Costo Canceladas={costo}"
+                        )
 
     # ==========================
     # BLINDAJE FINAL

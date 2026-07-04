@@ -43,12 +43,89 @@ def obtener_fechas_resumen(ruta):
         return "N/A", "N/A"
 
 
-def procesar_excel_rappi(rutas):
+def read_xml_spreadsheet(ruta_archivo):
+    """
+    Lee archivos Excel-XML (SpreadsheetML) que Rappi genera
+    con extensión .xlsx pero que no son archivos ZIP reales.
+    """
+    import xml.etree.ElementTree as ET
+    try:
+        tree = ET.parse(ruta_archivo)
+        root = tree.getroot()
+
+        ns_raw = root.tag.split("}")[0].lstrip("{") if "}" in root.tag else ""
+        ns = f"{{{ns_raw}}}" if ns_raw else ""
+
+        worksheets = root.findall(f".//{ns}Worksheet") or root.findall(".//Worksheet")
+
+        all_data = []
+        for ws in worksheets:
+            table = ws.find(f"{ns}Table") or ws.find("Table")
+            if table is None:
+                continue
+            rows = table.findall(f"{ns}Row") or table.findall("Row")
+            for row in rows:
+                row_data = []
+                cells = row.findall(f"{ns}Cell") or row.findall("Cell")
+                for cell in cells:
+                    data_tag = cell.find(f"{ns}Data") or cell.find("Data")
+                    val = data_tag.text if data_tag is not None and data_tag.text else ""
+                    row_data.append(val)
+                if any(v.strip() for v in row_data):
+                    all_data.append(row_data)
+
+        if not all_data:
+            return None
+        return pd.DataFrame(all_data)
+
+    except Exception as e:
+        print(f"[XML-Rappi] No se pudo leer {ruta_archivo}: {e}")
+        return None
+
+
+def read_html_mhtml(ruta_archivo):
+    """
+    Lee archivos MHTML/HTML que Rappi genera al descargar
+    reportes directamente desde el navegador.
+    """
+    try:
+        tablas = pd.read_html(ruta_archivo, header=None, flavor="lxml")
+        for tabla in tablas:
+            if tabla is not None and not tabla.empty and len(tabla.columns) > 2:
+                return tabla
+        return None
+    except Exception:
+        pass
+
+    try:
+        encodings = ["utf-8", "latin-1", "utf-16"]
+        contenido = None
+        for enc in encodings:
+            try:
+                with open(ruta_archivo, "r", encoding=enc, errors="replace") as f:
+                    contenido = f.read()
+                break
+            except Exception:
+                continue
+        if contenido:
+            import io
+            tablas = pd.read_html(io.StringIO(contenido), header=None)
+            for tabla in tablas:
+                if tabla is not None and not tabla.empty and len(tabla.columns) > 2:
+                    return tabla
+    except Exception as e:
+        print(f"[HTML-Rappi] No se pudo leer {ruta_archivo}: {e}")
+
+    return None
+
+
+def procesar_excel_rappi(rutas, meses_seleccionados=None):
     dataframes = []
 
     for ruta in rutas:
+        # 🔒 LECTURA ROBUSTA: intenta openpyxl (xlsx) y luego xlrd (xls)
+        hojas = None
         try:
-            # 🔒 LECTURA ROBUSTA (evita error stylesheet/XML)
             hojas = pd.read_excel(
                 ruta,
                 sheet_name=None,
@@ -56,6 +133,33 @@ def procesar_excel_rappi(rutas):
                 engine="openpyxl"
             )
         except Exception:
+            pass
+
+        if hojas is None:
+            try:
+                hojas = pd.read_excel(
+                    ruta,
+                    sheet_name=None,
+                    header=None,
+                    engine="xlrd"
+                )
+            except Exception:
+                pass
+
+        # INTENTO 3: XML-SPREADSHEET (Rappi descarga directa)
+        if hojas is None:
+            df_xml = read_xml_spreadsheet(ruta)
+            if df_xml is not None:
+                hojas = {"Sheet1": df_xml}
+
+        # INTENTO 4: HTML/MHTML (Rappi descarga desde navegador)
+        if hojas is None:
+            df_html = read_html_mhtml(ruta)
+            if df_html is not None:
+                hojas = {"Sheet1": df_html}
+
+        if hojas is None:
+            print(f"⚠️ No se pudo leer el archivo Rappi: {ruta}")
             continue
 
         for nombre_hoja, df_raw in hojas.items():
@@ -67,6 +171,7 @@ def procesar_excel_rappi(rutas):
             if fila_header is None:
                 continue
 
+            hoja_df = None
             try:
                 hoja_df = pd.read_excel(
                     ruta,
@@ -75,6 +180,20 @@ def procesar_excel_rappi(rutas):
                     engine="openpyxl"
                 )
             except Exception:
+                pass
+
+            if hoja_df is None:
+                try:
+                    hoja_df = pd.read_excel(
+                        ruta,
+                        sheet_name=nombre_hoja,
+                        header=fila_header,
+                        engine="xlrd"
+                    )
+                except Exception:
+                    pass
+
+            if hoja_df is None:
                 continue
 
             # 🔒 ELIMINAR DUPLICADOS INVISIBLES
@@ -141,6 +260,18 @@ def procesar_excel_rappi(rutas):
     # 🔒 BLINDAJE FINAL
     df_final = df_final.loc[:, ~df_final.columns.duplicated()]
     df_final.reset_index(drop=True, inplace=True)
+
+    # ==========================
+    # FILTRO POR MESES SELECCIONADOS
+    # ==========================
+    if meses_seleccionados and "Fecha de creación orden" in df_final.columns:
+        fechas_parsed = pd.to_datetime(
+            df_final["Fecha de creación orden"], errors="coerce"
+        )
+        mask_mes = fechas_parsed.dt.month.isin(meses_seleccionados)
+        # Conservar filas sin fecha válida (no las descartamos)
+        df_final = df_final[mask_mes | fechas_parsed.isna()].copy()
+        df_final.reset_index(drop=True, inplace=True)
 
     fecha_inicio, fecha_fin = obtener_fechas_resumen(rutas[0])
 

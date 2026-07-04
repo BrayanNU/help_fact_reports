@@ -8,8 +8,10 @@ from excel_processorPedidosYa_DetallesVentas import normalizar_texto, obtener_su
 test_names = [
     "Incheon - Comida Coreana",
     "Astrobuns Smash Burgers",
+    "Chickibuns",
     "incheon - comida coreana",
-    "astrobuns smash burgers"
+    "astrobuns smash burgers",
+    "chickibuns"
 ]
 
 print("Testing sucursal name matching:")

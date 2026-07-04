@@ -142,6 +142,90 @@ def read_broken_xlsx(ruta_archivo):
         return None
 
 
+def read_xml_spreadsheet(ruta_archivo):
+    """
+    Lee archivos Excel-XML (SpreadsheetML) que Rappi/PedidosYa
+    generan y que tienen extensión .xlsx pero no son ZIP reales.
+    """
+    import xml.etree.ElementTree as ET
+    try:
+        tree = ET.parse(ruta_archivo)
+        root = tree.getroot()
+
+        # Detectar namespace del documento
+        ns_raw = root.tag.split("}")[0].lstrip("{") if "}" in root.tag else ""
+        ns = f"{{{ns_raw}}}" if ns_raw else ""
+
+        # Intentar localizar Worksheet y Table
+        worksheets = root.findall(f".//{ns}Worksheet")
+        if not worksheets:
+            # Intentar sin namespace
+            worksheets = root.findall(".//Worksheet")
+
+        all_data = []
+        for ws in worksheets:
+            table = ws.find(f"{ns}Table") or ws.find("Table")
+            if table is None:
+                continue
+            for row in table.findall(f"{ns}Row") or table.findall("Row"):
+                row_data = []
+                for cell in row.findall(f"{ns}Cell") or row.findall("Cell"):
+                    data_tag = cell.find(f"{ns}Data") or cell.find("Data")
+                    val = data_tag.text if data_tag is not None and data_tag.text else ""
+                    row_data.append(val)
+                if any(v.strip() for v in row_data):
+                    all_data.append(row_data)
+
+        if not all_data:
+            return None
+
+        return pd.DataFrame(all_data)
+
+    except Exception as e:
+        print(f"[XML-Excel] No se pudo leer {ruta_archivo}: {e}")
+        return None
+
+
+def read_html_mhtml(ruta_archivo):
+    """
+    Lee archivos MHTML/HTML que PedidosYa y Rappi generan al
+    descargar reportes directamente desde el navegador.
+    Tienen extensión .xls o .xlsx pero son HTML por dentro.
+    """
+    try:
+        # pandas.read_html puede parsear tablas HTML incluyendo MHTML
+        tablas = pd.read_html(ruta_archivo, header=None, flavor="lxml")
+        for tabla in tablas:
+            if tabla is not None and not tabla.empty and len(tabla.columns) > 2:
+                return tabla
+        return None
+    except Exception:
+        pass
+
+    # Segundo intento: leer como texto y buscar tablas HTML dentro
+    try:
+        encodings = ["utf-8", "latin-1", "utf-16"]
+        contenido = None
+        for enc in encodings:
+            try:
+                with open(ruta_archivo, "r", encoding=enc, errors="replace") as f:
+                    contenido = f.read()
+                break
+            except Exception:
+                continue
+
+        if contenido:
+            import io
+            tablas = pd.read_html(io.StringIO(contenido), header=None)
+            for tabla in tablas:
+                if tabla is not None and not tabla.empty and len(tabla.columns) > 2:
+                    return tabla
+    except Exception as e:
+        print(f"[HTML-MHTML] No se pudo leer {ruta_archivo}: {e}")
+
+    return None
+
+
 # ==========================
 # HEADER FLEXIBLE POR BLOQUE
 # ==========================
@@ -172,7 +256,7 @@ def encontrar_fila_header(df_raw, diccionario_headers):
     return None
 
 
-def procesar_excel_pedidosya(rutas):
+def procesar_excel_pedidosya(rutas, meses_seleccionados=None):
 
     dataframes = []
 
@@ -180,7 +264,7 @@ def procesar_excel_pedidosya(rutas):
 
         hojas_raw = None
         
-        # INTENTO 1: LECTURA STANDARD
+        # INTENTO 1: LECTURA STANDARD (xlsx)
         try:
             hojas_raw = pd.read_excel(
                 ruta,
@@ -189,14 +273,44 @@ def procesar_excel_pedidosya(rutas):
                 engine="openpyxl"
             )
         except Exception:
-            # INTENTO 2: LECTURA MODO RECUPERACION (SOLO SHEET1)
+            pass
+
+        # INTENTO 2: LECTURA XLS ANTIGUO (xlrd)
+        if hojas_raw is None:
+            try:
+                hojas_raw = pd.read_excel(
+                    ruta,
+                    sheet_name=None,
+                    header=None,
+                    engine="xlrd"
+                )
+            except Exception:
+                pass
+
+        # INTENTO 3: LECTURA MODO RECUPERACION (xlsx ZIP corrupto)
+        if hojas_raw is None:
             print(f"Advertencia: Falló lectura standard de {ruta}. Intentando modo recuperación...")
             df_recuperado = read_broken_xlsx(ruta)
             if df_recuperado is not None:
                 hojas_raw = {"Sheet1": df_recuperado}
-        
+
+        # INTENTO 4: LECTURA COMO XML-SPREADSHEET (formato Rappi/PedidosYa descarga directa)
         if hojas_raw is None:
+            df_recuperado = read_xml_spreadsheet(ruta)
+            if df_recuperado is not None:
+                hojas_raw = {"Sheet1": df_recuperado}
+
+        # INTENTO 5: LECTURA HTML/MHTML (archivo descargado desde navegador)
+        if hojas_raw is None:
+            df_recuperado = read_html_mhtml(ruta)
+            if df_recuperado is not None:
+                hojas_raw = {"Sheet1": df_recuperado}
+
+        if hojas_raw is None:
+            print(f"⚠️ No se pudo leer: {ruta}")
             continue
+
+
 
         for nombre_hoja, df_raw in hojas_raw.items():
 
@@ -334,6 +448,17 @@ def procesar_excel_pedidosya(rutas):
     )
 
     df_final = df_final[df_final["Fecha de Pedido"].notna()].copy()
+
+    # ==========================
+    # FILTRO POR MESES SELECCIONADOS
+    # ==========================
+    if meses_seleccionados:
+        df_final = df_final[
+            df_final["Fecha de Pedido"].dt.month.isin(meses_seleccionados)
+        ].copy()
+
+    if df_final.empty:
+        return None, None, None
 
     # forzar mismo dtype en todo
     df_final["Fecha de Pedido"] = df_final["Fecha de Pedido"].dt.floor("s")

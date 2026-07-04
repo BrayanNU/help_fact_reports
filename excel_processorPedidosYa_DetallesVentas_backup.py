@@ -76,7 +76,8 @@ def obtener_sucursal_base(nombre):
     nombre = normalizar_texto(nombre)
     SUCURSALES_VALIDAS = {
         "astrobuns smash burgers": "Astrobuns | Smashburgers",
-        "incheon - comida coreana": "Incheon | Korean Fried Chicken"
+        "incheon - comida coreana": "Incheon | Korean Fried Chicken",
+        "chickibuns": "Chickibuns"
     }
     return SUCURSALES_VALIDAS.get(nombre, None)
 
@@ -91,7 +92,7 @@ def formatear_fecha_segura(fecha):
 # FUNCIÓN CENTRAL
 # ==========================================
 def procesar_finanzas_pedidosya(rutas, fecha_inicio=None, fecha_fin=None):
-    SUCURSALES_BASE = ["Astrobuns | Smashburgers", "Incheon | Korean Fried Chicken"]
+    SUCURSALES_BASE = ["Astrobuns | Smashburgers", "Incheon | Korean Fried Chicken", "Chickibuns"]
 
     resultados = defaultdict(lambda: {
         "total": 0.0,
